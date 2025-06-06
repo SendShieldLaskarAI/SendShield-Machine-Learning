@@ -229,5 +229,5 @@ if model is not None and tokenizer is not None:
             print(f"Terjadi error saat pemrosesan: {e}")
             print("Silakan coba lagi atau ketik 'exit' untuk keluar.")
 else:
-    print("🛑 Tidak dapat menjalankan mode inferensi interaktif karena model atau tokenizer gagal dimuat.")
+    print("Tidak dapat menjalankan mode inferensi interaktif karena model atau tokenizer gagal dimuat.")
 
