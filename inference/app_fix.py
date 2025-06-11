@@ -24,13 +24,13 @@ CONFIG = {
     "model_path": "model.h5",
     "tokenizer_path": "tokenizer.pickle",
     "nnya_exceptions_path": "nnya_exceptions.pkl",
-    "logo_path": "logo1.png",
-    "placeholder_image_path": "illustration.png",
+    "logo_path": "logo.png",  # PERHATIKAN: Path diubah ke .png
+    "placeholder_image_path": "illustration.png",  # PERHATIKAN: Path diubah ke .png
     "max_length": 120,
     "padding_type": 'post',
     "trunc_type": 'post',
-    "llm_model": "llama3.2:latest",
-    "llm_base_url": "http://localhost:11434"
+    "llm_model": "llama3.2:latest",  # Model yang umum tersedia di Groq
+    "ollama_base_url": "http://localhost:11434/v1"
 }
 
 LABEL_DESCRIPTIONS = {
@@ -39,13 +39,13 @@ LABEL_DESCRIPTIONS = {
 }
 LABEL_UI_DETAILS = {
     0: {"icon": "✅", "color": "green",
-        "header_style": "background-color: #e8f5e9; border-left: 5px solid #4caf50; padding: 10px; border-radius: 5px;"},
+        "header_style": "background-color: #e8f5e9; border-left: 5px solid #4caf50; padding: 15px; border-radius: 5px;"},
     1: {"icon": "ℹ️", "color": "blue",
-        "header_style": "background-color: #e3f2fd; border-left: 5px solid #2196f3; padding: 10px; border-radius: 5px;"},
+        "header_style": "background-color: #e3f2fd; border-left: 5px solid #2196f3; padding: 15px; border-radius: 5px;"},
     2: {"icon": "⚠️", "color": "orange",
-        "header_style": "background-color: #fff3e0; border-left: 5px solid #ff9800; padding: 10px; border-radius: 5px;"},
+        "header_style": "background-color: #fff3e0; border-left: 5px solid #ff9800; padding: 15px; border-radius: 5px;"},
     3: {"icon": "🚨", "color": "red",
-        "header_style": "background-color: #ffebee; border-left: 5px solid #f44336; padding: 10px; border-radius: 5px;"}
+        "header_style": "background-color: #ffebee; border-left: 5px solid #f44336; padding: 15px; border-radius: 5px;"}
 }
 
 
@@ -61,15 +61,25 @@ def load_all_resources():
     """
     print("Memulai inisialisasi SEMUA resource (cached)...")
 
-    # Inisialisasi Klien LLM
+    # Inisialisasi Klien LLM dengan Logika Fallback
+    llm_client = None
+    llm_mode = "Manual"
     try:
-        llm_client = OpenAI(base_url=CONFIG["llm_base_url"], api_key='ollama')
-        llm_available = True
-        print("Klien LLM berhasil diinisialisasi.")
+        if "GROQ_API_KEY" in st.secrets:
+            print("API Key Groq ditemukan. Menginisialisasi klien untuk Groq Cloud...")
+            llm_client = OpenAI(base_url="https://api.groq.com/openai/v1", api_key=st.secrets["GROQ_API_KEY"])
+            llm_client.models.list()
+            llm_mode = "Groq"
+        else:
+            print("API Key Cloud tidak ditemukan. Mencoba terhubung ke Ollama lokal...")
+            llm_client = OpenAI(base_url=CONFIG["ollama_base_url"], api_key='ollama')
+            llm_client.models.list()
+            llm_mode = "Ollama"
     except Exception as e:
+        print(f"Gagal menginisialisasi Klien LLM. Mode fallback: Manual. Error: {e}")
         llm_client = None
-        llm_available = False
-        print(f"Fitur LLM tidak aktif: {e}")
+        llm_mode = "Manual"
+    print(f"Mode Asisten AI 'AURA' yang aktif: {llm_mode}")
 
     # Pemuatan Model dan Tokenizer
     model, tokenizer, model_success, tokenizer_success = None, None, False, False
@@ -103,19 +113,18 @@ def load_all_resources():
     except FileNotFoundError:
         print(
             f"File '{CONFIG['nnya_exceptions_path']}' tidak ditemukan. 'kata_baku_berulang_plus_nnya' mungkin tidak lengkap.")
-        nnya_exceptions = set()  # Fallback
+        nnya_exceptions = set()
         nnya_setup_success = False
 
-    kata_baku_berulang_final = {
-        "allah", "nggak", "saat", "tinggal", "ngga", "alloh", "bukannya", "maaf", "uud", "tinggi", "omongannya",
-        "nunggu", "tunggu",
-        "sesungguhnya", "hingga", "ucapannya", "dajjal", "astaghfirullah", "sehingga", "menjelekkan", "meninggal",
-        "sll", "menunjukkan", "panggung", "kerjaan",
-        "kenyataan", "sungguh", "bangga", "panggil", "muhammadiyah", "ttp", "nggk", "kekuasaan", "menggonggong", "sllu",
-        "melanggar", "cangkemmu", "kanggo", "menunggu", "dipanggil", "pertanggung", "menggulingkan", "pikirannya",
-        "perkataan", "menganggap", "suul", "keadaan", "saatnya", "muhammad", "engga", "anggota", "kelakukannya",
-        "bloon", "dianggap", "kerjaannya", "manfaatnya", "dll", "diindonesia", "jelekkan", "tanggung", "alhamdulillah",
-    }
+    kata_baku_berulang_final = {"allah", "nggak", "saat", "tinggal", "ngga", "alloh", "bukannya", "maaf", "uud",
+                                "tinggi", "omongannya", "nunggu", "tunggu", "sesungguhnya", "hingga", "ucapannya",
+                                "dajjal", "astaghfirullah", "sehingga", "menjelekkan", "meninggal", "sll",
+                                "menunjukkan", "panggung", "kerjaan", "kenyataan", "sungguh", "bangga", "panggil",
+                                "muhammadiyah", "ttp", "nggk", "kekuasaan", "menggonggong", "sllu", "melanggar",
+                                "cangkemmu", "kanggo", "menunggu", "dipanggil", "pertanggung", "menggulingkan",
+                                "pikirannya", "perkataan", "menganggap", "suul", "keadaan", "saatnya", "muhammad",
+                                "engga", "anggota", "kelakukannya", "bloon", "dianggap", "kerjaannya", "manfaatnya",
+                                "dll", "diindonesia", "jelekkan", "tanggung", "alhamdulillah"}
     kata_baku_plus_nnya = kata_baku_berulang_final.copy()
     kata_baku_plus_nnya.update(nnya_exceptions)
 
@@ -154,14 +163,12 @@ def load_all_resources():
                        "terbodoh", "tergoblok", "terjelek", "terjijik", "terkutuk", "terjahat", "paling", "gelandangan",
                        "pengemis", "sampah", "bangkai", "comberan", "kotoran"}
 
-    print("SEMUA resource selesai diinisialisasi.")
-
     return {
         "model": model, "tokenizer": tokenizer, "stemmer": stemmer, "llm_client": llm_client,
         "norm": norm_dict, "custom_stopwords": custom_sw_list,
         "protected_words": protected_words, "kata_baku_plus_nnya": kata_baku_plus_nnya,
         "status": {
-            "model_ok": model_success, "tokenizer_ok": tokenizer_success, "llm_ok": llm_available,
+            "model_ok": model_success, "tokenizer_ok": tokenizer_success, "llm_mode": llm_mode,
             "nnya_ok": nnya_setup_success
         }
     }
@@ -236,41 +243,45 @@ def preprocess_text(raw_text, resources):
     if not is_text_valid_for_inference(text): return ""
     return text
 
+
 @st.cache_data
-def get_llm_feedback(prediction_index, _llm_client):  # <--- PERUBAHAN DI SINI
-    """
-    Menghasilkan prompt dan memanggil LLM berdasarkan prediksi.
-    Argumen _llm_client diabaikan oleh cache Streamlit.
-    """
-    if not _llm_client: # <--- GUNAKAN _llm_client DI DALAM FUNGSI
-        return "Layanan Asisten AI tidak tersedia saat ini. Periksa apakah Ollama atau LM Studio sudah berjalan."
+def get_aura_feedback(prediction_index, _llm_client, llm_mode):
+    if llm_mode == "Manual":
+        print("AURA: Menggunakan feedback manual/template.")
+        if prediction_index == 0:
+            return "Kerja bagus! Komunikasi Anda positif. Teruslah menjadi contoh yang baik di dunia maya!"
+        elif prediction_index == 1:
+            return "Teks ini berpotensi ditafsirkan sebagai perundungan ringan. Cobalah untuk meninjau kembali pilihan kata agar pesan Anda dapat diterima dengan lebih baik."
+        elif prediction_index == 2:
+            return "Peringatan: Teks ini mengandung kata-kata yang dapat menyakiti orang lain. Mohon pertimbangkan dampaknya sebelum mengirim. Berkomunikasi dengan empati sangat penting."
+        elif prediction_index == 3:
+            return "BAHAYA: Teks ini mengandung unsur perundungan yang serius. Bahasa seperti ini memiliki konsekuensi nyata. Kami sangat menyarankan untuk tidak mengirim pesan ini demi menjaga keamanan bersama."
+        else:
+            return ""
 
-    prompt = ""
+    print(f"AURA: Menghasilkan feedback dari LLM mode ({llm_mode})...")
     system_role = "Anda adalah Asisten AI yang positif dan suportif bernama 'AURA' (Asisten Untuk Ruang Aman)."
-
+    prompt = ""
     if prediction_index == 0:
         prompt = "Sebuah teks baru saja dianalisis dan teridentifikasi tidak mengandung perundungan. Berikan pujian singkat atas komunikasi yang positif dan berikan 1-2 tips umum untuk terus menjaga interaksi online tetap sehat dan positif. Jaga agar respons singkat dan memotivasi."
     elif prediction_index == 1:
-        system_role = "Anda adalah Asisten AI yang bijaksana dan empatik bernama 'AURA'."
-        prompt = "Sebuah teks dianalisis dan terdeteksi mengandung potensi perundungan tingkat rendah, seperti sarkasme yang bisa menyinggung atau ejekan halus. Tanpa perlu tahu teks aslinya, jelaskan secara umum mengapa komunikasi semacam ini kadang bisa disalahpahami dan berikan satu tips untuk memastikan candaan atau kritik diterima dengan baik. Fokus pada kesadaran diri dan empati."
+        system_role = "Anda adalah Asisten AI yang bijaksana dan empatik bernama 'AURA'."; prompt = "Sebuah teks dianalisis dan terdeteksi mengandung potensi perundungan tingkat rendah, seperti sarkasme yang bisa menyinggung atau ejekan halus. Tanpa perlu tahu teks aslinya, jelaskan secara umum mengapa komunikasi semacam ini kadang bisa disalahpahami dan berikan satu tips untuk memastikan candaan atau kritik diterima dengan baik. Fokus pada kesadaran diri dan empati."
     elif prediction_index == 2:
-        system_role = "Anda adalah Asisten AI yang peduli dan bertanggung jawab bernama 'AURA'."
-        prompt = "Sebuah teks dianalisis dan terdeteksi mengandung potensi perundungan tingkat sedang, seperti penggunaan kata-kata kasar atau serangan personal. Tanpa perlu tahu teks aslinya, berikan nasihat edukatif. Jelaskan secara umum dampak negatif dari bahasa semacam itu. Kemudian, berikan 1-2 saran praktis untuk refleksi diri sebelum mengirim pesan, seperti 'berpikir sejenak' atau 'memeriksa ulang nada tulisan'. Tujuannya adalah mendorong refleksi, bukan menghakimi."
+        system_role = "Anda adalah Asisten AI yang peduli dan bertanggung jawab bernama 'AURA'."; prompt = "Sebuah teks dianalisis dan terdeteksi mengandung potensi perundungan tingkat sedang, seperti penggunaan kata-kata kasar atau serangan personal. Tanpa perlu tahu teks aslinya, berikan nasihat edukatif. Jelaskan secara umum dampak negatif dari bahasa semacam itu. Kemudian, berikan 1-2 saran praktis untuk refleksi diri sebelum mengirim pesan, seperti 'berpikir sejenak' atau 'memeriksa ulang nada tulisan'. Tujuannya adalah mendorong refleksi, bukan menghakimi."
     elif prediction_index == 3:
-        system_role = "Anda adalah Asisten AI yang sangat peduli terhadap keamanan online bernama 'AURA'."
-        prompt = "Sebuah teks baru saja dianalisis dan terdeteksi mengandung konten berbahaya atau perundungan tingkat tinggi, seperti ancaman atau ujaran kebencian serius. Tanpa perlu tahu teks aslinya, tugas Anda adalah memberikan peringatan yang serius dan fokus pada keamanan. Jelaskan secara umum bahaya dari komunikasi semacam itu. Sarankan dengan tegas untuk tidak mengirim pesan tersebut dan pertimbangkan untuk berbicara dengan seseorang yang dipercaya jika sedang merasa sangat marah. Prioritaskan de-eskalasi dan keamanan."
+        system_role = "Anda adalah Asisten AI yang sangat peduli terhadap keamanan online bernama 'AURA'."; prompt = "Sebuah teks baru saja dianalisis dan terdeteksi mengandung konten berbahaya atau perundungan tingkat tinggi, seperti ancaman atau ujaran kebencian serius. Tanpa perlu tahu teks aslinya, tugas Anda adalah memberikan peringatan yang serius dan fokus pada keamanan. Jelaskan secara umum bahaya dari komunikasi semacam itu. Sarankan dengan tegas untuk tidak mengirim pesan tersebut dan pertimbangkan untuk berbicara dengan seseorang yang dipercaya jika sedang merasa sangat marah. Prioritaskan de-eskalasi dan keamanan."
     else:
         return "Tidak ada saran yang tersedia untuk prediksi ini."
 
     try:
-        response = _llm_client.chat.completions.create(model=CONFIG["llm_model"], # <--- GUNAKAN _llm_client
-                                                      messages=[{"role": "system", "content": system_role},
-                                                                {"role": "user", "content": prompt}], temperature=0.7,
-                                                      max_tokens=1000)
+        response = _llm_client.chat.completions.create(model=CONFIG["llm_model"],
+                                                       messages=[{"role": "system", "content": system_role},
+                                                                 {"role": "user", "content": prompt}], temperature=0.7,
+                                                       max_tokens=1000)
         return response.choices[0].message.content
     except Exception as e:
-        print(f"Error saat menghubungi LLM: {e}")
-        return "Maaf, terjadi kesalahan saat mencoba menghubungi Asisten AI. Pastikan layanan LLM (Ollama/LM Studio) Anda aktif dan dapat diakses."
+        print(f"Error saat menghubungi LLM, fallback ke manual: {e}")
+        return get_aura_feedback(prediction_index, None, "Manual")
 
 
 def run_prediction_pipeline(raw_text, resources):
@@ -288,7 +299,7 @@ def run_prediction_pipeline(raw_text, resources):
     pred_index = np.argmax(probabilities)
     pred_label = LABEL_DESCRIPTIONS.get(pred_index, "Tidak Diketahui")
 
-    llm_feedback = get_llm_feedback(pred_index, resources["llm_client"])
+    llm_feedback = get_aura_feedback(pred_index, resources["llm_client"], resources["status"]["llm_mode"])
 
     return {"prediction": pred_label, "probabilities": probabilities, "processed_text": processed_text,
             "llm_feedback": llm_feedback}
@@ -306,17 +317,19 @@ def render_sidebar(resources):
     else:
         st.sidebar.error("Model Deteksi Gagal Dimuat.", icon="❌")
 
-    if status.get("llm_ok"):
-        st.sidebar.success("Asisten AI 'AURA' Aktif.", icon="✨")
+    llm_mode = status.get("llm_mode", "Tidak Aktif")
+    if llm_mode == "Groq":
+        st.sidebar.success("Asisten AI 'AURA' (Cloud) Aktif.", icon="☁️")
+    elif llm_mode == "Ollama":
+        st.sidebar.success("Asisten AI 'AURA' (Lokal) Aktif.", icon="💻")
     else:
-        st.sidebar.warning("Asisten AI 'AURA' Tidak Aktif.", icon="🔌")
+        st.sidebar.warning("Asisten AI 'AURA' (Manual) Aktif.", icon="📝")
 
     if not status.get("nnya_ok"):
-        st.sidebar.warning(
-            f"File '{CONFIG['nnya_exceptions_path']}' tidak ditemukan. Preprocessing mungkin kurang akurat.")
+        st.sidebar.warning(f"File '{CONFIG['nnya_exceptions_path']}' tidak ditemukan.")
 
     st.sidebar.header("Navigasi")
-    st.sidebar.info("Halaman 'About' dan 'Contact' bisa ditambahkan di sini pada aplikasi multi-halaman.")
+    st.sidebar.info("Halaman 'About' dan 'Contact' bisa ditambahkan di sini.")
 
 
 def render_results(result_data):
@@ -328,18 +341,19 @@ def render_results(result_data):
     confidence_score = probabilities[pred_label_index]
     ui_detail = LABEL_UI_DETAILS.get(pred_label_index, {"icon": "❓", "color": "gray"})
 
-    metric_cols = st.columns(2)
-    metric_cols[0].metric(label="Prediksi", value=prediction)
-    metric_cols[1].metric(label="Tingkat Keyakinan", value=f"{confidence_score:.2%}")
-    st.markdown("---")
+    st.metric(label="Prediksi", value=prediction)
+    st.metric(label="Tingkat Keyakinan", value=f"{confidence_score:.2%}")
 
+    st.markdown("---")
     st.markdown("##### ✨ Masukan dari Asisten AI 'AURA'")
     feedback_style = ui_detail.get("header_style", "")
     st.markdown(f"<div style='{feedback_style}'>{llm_feedback}</div>", unsafe_allow_html=True)
 
     with st.expander("Lihat Rincian Analisis"):
         st.write("**Teks Setelah Preprocessing:**")
-        st.text(result_data["processed_text"] if result_data["processed_text"] else "(Tidak ada teks valid)")
+        st.text_area("",
+                     value=result_data["processed_text"] if result_data["processed_text"] else "(Tidak ada teks valid)",
+                     height=100, disabled=True, key="processed_text_display")
         st.write("**Probabilitas per Kelas:**")
         prob_df = pd.DataFrame({'Kelas': LABEL_DESCRIPTIONS.values(), 'Probabilitas': probabilities})
         st.bar_chart(prob_df.set_index('Kelas'))
@@ -364,22 +378,17 @@ def main():
 
     st.title("Cyberbullying Detection")
     st.markdown("Analisis teks untuk mendeteksi potensi perundungan siber secara real-time.")
-    st.markdown("---")
+
+    st.subheader("Masukkan Teks Anda")
+    user_input = st.text_area(
+        "Teks untuk dianalisis:", height=200, key="user_text_input",
+        placeholder="Contoh: Kamu hebat sekali! Terima kasih atas bantuannya kemarin."
+    )
+    analyze_button = st.button("Analisis Teks", type="primary", use_container_width=True,
+                               disabled=not (resources["status"]["model_ok"] and resources["status"]["tokenizer_ok"]))
 
     if 'prediction_result' not in st.session_state:
         st.session_state.prediction_result = None
-
-    main_cols = st.columns(2)
-
-    with main_cols[0]:
-        st.subheader("Masukkan Teks Anda")
-        user_input = st.text_area(
-            "Teks untuk dianalisis:", height=250, key="user_text_input",
-            placeholder="Contoh: Kamu hebat sekali! Terima kasih atas bantuannya kemarin."
-        )
-        analyze_button = st.button("Analisis Teks", type="primary", use_container_width=True,
-                                   disabled=not (
-                                               resources["status"]["model_ok"] and resources["status"]["tokenizer_ok"]))
 
     if analyze_button:
         if user_input.strip():
@@ -389,15 +398,27 @@ def main():
             st.warning("Input teks tidak boleh kosong.", icon="✍️")
             st.session_state.prediction_result = None
 
-    with main_cols[1]:
-        st.subheader("Hasil Analisis")
-        if st.session_state.prediction_result:
+    if st.session_state.prediction_result:
+        st.markdown("---")
+        result_cols = st.columns(2)
+        with result_cols[0]:
+            st.subheader("📊 Hasil Analisis")
             render_results(st.session_state.prediction_result)
-        else:
+
+        with result_cols[1]:
+            # Bagian kanan sekarang bisa diisi gambar atau info tambahan
+            st.subheader("Tentang SendShield")
             try:
-                st.image(CONFIG["placeholder_image_path"], caption="Menunggu analisis...")
+                st.image(CONFIG["placeholder_image_path"], caption="Jaga jarimu, jaga hatimu.")
             except FileNotFoundError:
-                st.info("Hasil akan ditampilkan di sini.")
+                st.info("SendShield membantu Anda memahami dampak dari kata-kata sebelum Anda mengirimnya.")
+
+    elif not analyze_button:
+        st.markdown("---")
+        try:
+            st.image(CONFIG["placeholder_image_path"], use_column_width=True)
+        except FileNotFoundError:
+            st.info("Hasil analisis akan ditampilkan di sini.")
 
 
 if __name__ == "__main__":
